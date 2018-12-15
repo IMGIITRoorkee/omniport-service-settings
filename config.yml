@@ -1,0 +1,8 @@
+nomenclature:
+  name: settings
+  verboseName: Settings
+description: Fine tune Omniport to your taste
+isApi: true
+baseUrls:
+  http: settings/
+
