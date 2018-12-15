@@ -30,7 +30,6 @@ class SessionMapSerializer(serializers.ModelSerializer):
         model = SessionMap
         exclude = [
             'session_key',
-            'ip_address',
             'user_agent',
             'browser_version',
         ]
