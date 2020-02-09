@@ -13,7 +13,7 @@ from settings.views.session_map import SessionMapViewSet
 app_name = 'settings'
 
 router = routers.SimpleRouter()
-router.register('session_map', SessionMapViewSet, base_name='session_map')
+router.register('session_map', SessionMapViewSet, basename='session_map')
 
 urlpatterns = [
     path(
