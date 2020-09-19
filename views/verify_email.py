@@ -1,68 +1,125 @@
-from rest_framework import generics, permissions
-from rest_framework.exceptions import NotFound
-from formula_one.serializers.generics.contact_information import ContactInformationSerializer
-from omniport.utils.switcher import load_serializer
-from omniport.settings.configuration.base import CONFIGURATION
-from settings.utils.verify_email import send_email, get_contact
-from rest_framework import generics, response, status
-from kernel.models import Person
+import swapper
+from rest_framework import generics, response, status, permissions
+from rest_framework.exceptions import ValidationError
+
 from base_auth.models import User
-from django.utils.http import urlsafe_base64_encode
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_bytes
-from django.contrib.auth.tokens import default_token_generator
+from formula_one.serializers.generics.contact_information import \
+    ContactInformationSerializer
+from formula_one.utils.verification_token import send_token, \
+    verify_access_token, delete
+
+from omniport.settings.configuration.base import CONFIGURATION
 
 
 class VerifyEmailView(generics.GenericAPIView):
     """
-    This view when responding to a GET request, generates email verification token
-    and sends mail to the concerned user.
+    This view when responding to a POST request, generates email verification
+    token and sends mail to the concerned user.
     """
-    permission_classes = [permissions.IsAuthenticated, ]
-    serializer_class = ContactInformationSerializer
 
-    def get(self, request):
+    def post(self, request):
         """
-        View to serve GET requests
+        View to serve POST requests
         :param request: the request this is to be responded to
         :return: the response for request
         """
-        site_name = CONFIGURATION.site.nomenclature.verbose_name
 
-        url = 'http://stage.channeli.in/api/settings/verify_email/'
-        subject = f'{site_name} Email Verification'
-        body = f'To verify you email address, please visit {url}param'
         user = request.user
-        contact = get_contact(user)
-        send_email(
-            uid=urlsafe_base64_encode(force_bytes(user.id)),
-            token=default_token_generator.make_token(request.user),
+        person = user.person
+        email = request.GET.get('email', None)
+
+        site_name = CONFIGURATION.site.nomenclature.verbose_name
+        site_url = CONFIGURATION.allowances.hosts[0]
+        token_type = 'VERIFICATION_TOKEN'
+        url = f'https://{site_url}/settings/verify_email/?token={token_type}&email={email}'
+        subject = f'{site_name} EMAIL VERIFICATION'
+        body = f'To verify your {site_name} email address, please visit url'
+        if email is None:
+            raise ValidationError(detail={'Email address not found'})
+        contact = person.contact_information.filter(email_address=email).get()
+        if (
+                contact is None or
+                contact.institute_webmail_address is None
+        ):
+            return response.Response(
+                data=f'Could not fetch email address, '
+                     f'please contact the maintainers.',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        send_token(
+            user_id=user.id,
+            person_id=person.id,
+            token_type=token_type,
             email_body=body,
             email_subject=subject,
-            email_ids=[contact.email_address],
             url=url,
+            category=None,
+            use_primary_email=False,
+            check_if_primary_email_verified=False
         )
+
+        email_id, domain = contact.institute_webmail_address.split('@')
+        hidden_email = (f'{email_id[:3]}'
+                        f'{"*" * max(len(email_id) - 3, 0)}'
+                        f'@{domain}')
         return response.Response(
-            data=f'Email sent successfully to {contact.email_address}',
+            data=f'Email sent successfully to {hidden_email}',
             status=status.HTTP_200_OK,
         )
 
 
 class VerifyTokenView(generics.GenericAPIView):
-    def get(self, request, *args, **kwargs):
+    permission_classes = [permissions.IsAuthenticated, ]
+    serializer_class = ContactInformationSerializer
+
+    @verify_access_token
+    def get(self, request, *args):
         """
-        View to serve POST requests to verify the url token and verify email upon validation
-        :param request: the request this is to be responded to
-        :return: the response for request
+        This view serves GET request, and verifies the email address of the user
+        :param request: the request that is being responded to
+        :return: the response to the request.
         """
-        uidb64 = request.GET.get('uid')
-        token = request.GET.get('token')
-        user = User.objects.get(id=urlsafe_base64_decode(uidb64))
-        if_valid = default_token_generator.check_token(user, token)
-        if(if_valid):
-            Person.objects.get(user=user).contact_information.update(email_address_verified = True)
-            response_data = Person.objects.get(user=user).contact_information.get().email_address_verified
+
+        token_data, verification_token = args[:2]
+        email_address = request.GET.get('email')
+        print(email_address)
+        print(token_data['user_id'])
+        print(verification_token)
+        user_id = token_data['user_id']
+        user = User.objects.get(id=user_id)
+
+        if not user_id or ("VERIFICATION_TOKEN" != token_data['token_type']):
+            return response.Response(
+                data="Incorrect token type",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        Person = swapper.load_model('kernel', 'Person')
+        try:
+            person = Person.objects.get(user=user)
+        except Person.DoesNotExist:
+            return response.Response(
+                data='User corresponding to this token does not exist',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (not email_address or
+                not person.contact_information.first().email_address or
+                not person.contact_information.filter(
+                    email_address=email_address)
+        ):
+            return response.Response(
+                data="Email address mismatch",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        Person.objects.get(user=user).contact_information.filter(
+            email_address=email_address).update(
+            email_address_verified=True)
+
+        delete(verification_token)
+
         return response.Response(
-            data=response_data,
+            data='Successfully verified email.',
             status=status.HTTP_200_OK,
         )
