@@ -4,6 +4,7 @@ from rest_framework import routers
 from settings.views.biological_information import BiologicalInformationView
 from settings.views.change_password import ChangePasswordView
 from settings.views.change_secrets import ChangeSecretsView
+from settings.views.contact_information import ContactInformationView
 from settings.views.display_picture import DisplayPictureView
 from settings.views.financial_information import FinancialInformationView
 from settings.views.political_information import PoliticalInformationView
@@ -37,6 +38,11 @@ urlpatterns = [
         'biological_information/',
         BiologicalInformationView.as_view(),
         name='biological_information'
+    ),
+    path(
+        'contact_information/',
+        ContactInformationView.as_view(),
+        name='contact_information'
     ),
     path(
         'financial_information/',
