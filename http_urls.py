@@ -10,7 +10,7 @@ from settings.views.financial_information import FinancialInformationView
 from settings.views.political_information import PoliticalInformationView
 from settings.views.residential_information import ResidentialInformationView
 from settings.views.session_map import SessionMapViewSet
-
+from settings.views.verify_email import VerifyEmailView, VerifyTokenView
 app_name = 'settings'
 
 router = routers.SimpleRouter()
@@ -59,6 +59,15 @@ urlpatterns = [
         ResidentialInformationView.as_view(),
         name='residential_information'
     ),
-
+    path(
+        'verify_email/',
+        VerifyEmailView.as_view(),
+        name='verify_email'
+    ),
+    path(
+        'verify_token/',
+        VerifyTokenView.as_view(),
+        name='verify_token'
+    ),
     path('', include(router.urls)),
 ]
