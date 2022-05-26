@@ -1,11 +1,14 @@
-from omniport.utils.switcher import load_serializer
 from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework import status
-import swapper
-Residence = swapper.load_model('kernel', 'Residence')
 
+from omniport.utils.switcher import load_serializer
+
+import swapper
+
+
+Residence = swapper.load_model('kernel', 'Residence')
 
 class ResidentialInformationView(generics.RetrieveUpdateAPIView,
                                  generics.CreateAPIView):
@@ -31,6 +34,10 @@ class ResidentialInformationView(generics.RetrieveUpdateAPIView,
             )
 
     def partial_update(self, request, *args, **kwargs):
+        """
+        Update the residential information of the person currently logged in
+        :return: Updated instance
+        """
 
         person = self.request.person
         try:

@@ -30,6 +30,10 @@ class FinancialInformationView(generics.RetrieveUpdateAPIView,
             )
 
     def partial_update(self, request, *args, **kwargs):
+        """
+        Update the financial information of the person currently logged in
+        :return: Updated instance
+        """
 
         person = self.request.person
         try:
@@ -40,5 +44,8 @@ class FinancialInformationView(generics.RetrieveUpdateAPIView,
             serializer.is_valid(raise_exception=True)
             serializer.save(person_id=person.id)
             headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED,
-                            headers=headers)
+            return Response (
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
